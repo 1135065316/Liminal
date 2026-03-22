@@ -25,18 +25,8 @@ def main():
         print("请先配置 DEEPSEEK_API_KEY")
         return
 
-    # 获取用户输入的任务
-    if len(sys.argv) > 1:
-        task = " ".join(sys.argv[1:])
-    else:
-        task = input("任务: ").strip()
-    
-    if not task:
-        return
-
     # 生成对话ID（基于开始时间的时间戳）
     conversation_id = generate_conversation_id()
-    print(f"开始执行: {task}")
     print(f"对话ID: {conversation_id}\n")
 
     # 获取 skill 命令帮助
@@ -44,8 +34,6 @@ def main():
 
     # 设置系统提示词
     system_msg = f"""你是自动化 Agent，工作目录: {WORK_DIR}
-你的任务是分析需求，生成命令来逐步完成任务。
-
 你可以使用两种类型的命令：
 1. **Bash 命令**: 普通的 shell 命令，如 `ls -la`, `cat file.txt`
 2. **Skill 命令**: 预定义的文件/代码操作函数，格式为 `函数名(参数1, 参数2, ...)`
@@ -59,15 +47,27 @@ def main():
 
 {skill_help}"""
 
-    messages = [
-        {"role": "system", "content": system_msg},
-        {"role": "user", "content": f"任务: {task}\n\n请给出第一个命令:"}
-    ]
+    messages = [{"role": "system", "content": system_msg}]
+
+    # 获取初始输入（命令行或交互式）
+    if len(sys.argv) > 1:
+        user_input = " ".join(sys.argv[1:])
+        messages.append({"role": "user", "content": user_input})
+    else:
+        user_input = None  # 将在循环中获取
 
     try:
         round_num = 0
         while True:
             round_num += 1
+            
+            # 获取用户输入（首次交互式或任务完成后）
+            if user_input is None:
+                user_input = input("> ").strip()
+                if not user_input:
+                    break
+                messages.append({"role": "user", "content": user_input})
+                user_input = ""  # 标记为已处理，进入 AI 自动执行模式
             
             # 检查上下文长度
             is_limited, current_tokens, token_limit = check_context_limit(messages)
@@ -83,11 +83,14 @@ def main():
             if response.startswith("DONE:"):
                 print(f"完成: {response}")
                 messages.append({"role": "assistant", "content": response})
-                break
+                user_input = None  # 继续对话，下一轮获取输入
+                continue
+            
             if response.startswith("FAIL:"):
                 print(f"失败: {response}")
                 messages.append({"role": "assistant", "content": response})
-                break
+                user_input = None  # 继续对话，下一轮获取输入
+                continue
             
             # 可中断的命令执行
             with Interruptible(messages, "命令执行") as op:
@@ -98,10 +101,11 @@ def main():
             print(f"  -> {output[:200]}{'...' if len(output) > 200 else ''}\n")
             
             messages.append({"role": "assistant", "content": response})
-            messages.append({"role": "user", "content": f"执行结果:\n{output}\n\n请继续（DONE: 完成 / FAIL: 失败 / 下一个命令）:"})
+            messages.append({"role": "user", "content": f"执行结果:\n{output}\n\n请继续:"})
             
             # 显示当前 token 使用情况
             print(f"[上下文: {current_tokens}/{token_limit} tokens]")
+            # user_input 保持原值，下一轮继续 AI 自动执行
     except KeyboardInterrupt:
         print("\n\n用户强制退出，正在保存对话...")
         messages.append({"role": "user", "content": "[用户强制退出]"})

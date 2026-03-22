@@ -35,12 +35,16 @@ def create_file(filepath, content=""):
 
 def read_file(filepath):
     """
-    读取文件全部内容
+    读取文件全部内容（带文件信息头部）
     
     参数:
         filepath: 文件路径
     返回:
         (success: bool, content: str)
+    
+    返回格式:
+        [文件: xxx | 共 N 行 | X.XX KB]
+        文件内容...
     """
     try:
         path = Path(filepath)
@@ -48,8 +52,27 @@ def read_file(filepath):
             return False, f"文件不存在: {filepath}"
         if not path.is_file():
             return False, f"路径不是文件: {filepath}"
+        
+        # 读取内容
         content = path.read_text(encoding='utf-8')
-        return True, content
+        
+        # 统计行数
+        line_count = content.count('\n')
+        if content and not content.endswith('\n'):
+            line_count += 1
+        
+        # 格式化大小
+        size_bytes = path.stat().st_size
+        if size_bytes < 1024:
+            size_str = f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            size_str = f"{size_bytes / 1024:.2f} KB"
+        else:
+            size_str = f"{size_bytes / 1024 / 1024:.2f} MB"
+        
+        # 添加信息头部
+        header = f"[文件: {filepath} | 共 {line_count} 行 | {size_str}]\n"
+        return True, header + content
     except Exception as e:
         return False, f"文件读取失败: {e}"
 
@@ -128,6 +151,55 @@ def move_file(src, dst):
 
 
 # ==================== 精细行级操作（编程专用） ====================
+
+def file_info(filepath):
+    """
+    获取文件元数据信息
+    
+    参数:
+        filepath: 文件路径
+    返回:
+        (success: bool, info: str)
+    
+    示例:
+        file_info("test.py")  # 返回行数、大小、修改时间等
+    """
+    try:
+        path = Path(filepath)
+        if not path.exists():
+            return False, f"文件不存在: {filepath}"
+        if not path.is_file():
+            return False, f"路径不是文件: {filepath}"
+        
+        # 获取文件统计信息
+        stat = path.stat()
+        size_bytes = stat.st_size
+        
+        # 格式化文件大小
+        if size_bytes < 1024:
+            size_str = f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            size_str = f"{size_bytes / 1024:.2f} KB"
+        else:
+            size_str = f"{size_bytes / 1024 / 1024:.2f} MB"
+        
+        # 统计行数
+        with open(path, 'r', encoding='utf-8', errors='replace') as f:
+            line_count = sum(1 for _ in f)
+        
+        # 格式化修改时间
+        from datetime import datetime
+        mtime = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+        
+        info = f"""文件: {filepath}
+行数: {line_count}
+大小: {size_str}
+修改时间: {mtime}"""
+        
+        return True, info
+    except Exception as e:
+        return False, f"获取文件信息失败: {e}"
+
 
 def read_lines(filepath, start=1, end=None):
     """
@@ -335,6 +407,76 @@ def replace_line(filepath, line_num, content):
         return False, f"替换行失败: {e}"
 
 
+def replace_multi_lines(filepath, start_line, end_line, content):
+    """
+    替换多行内容（将指定范围的行替换为新内容）
+    
+    参数:
+        filepath: 文件路径
+        start_line: 起始行号（从1开始，包含），支持 -1 表示最后一行
+        end_line: 结束行号（包含），支持 -1 表示最后一行，必须 >= start_line
+        content: 新内容（字符串，可包含多行）
+    返回:
+        (success: bool, message: str)
+    
+    示例:
+        replace_multi_lines("test.py", 3, 10, "    # 新代码块\n    pass")
+        replace_multi_lines("test.py", 1, -1, "新内容")  # 替换整个文件
+    """
+    try:
+        path = Path(filepath)
+        if not path.exists():
+            return False, f"文件不存在: {filepath}"
+        
+        with open(path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        total = len(lines)
+        if total == 0:
+            return False, "文件为空"
+        
+        # 处理负数行号
+        if start_line < 0:
+            start_line = total + start_line + 1
+        if end_line < 0:
+            end_line = total + end_line + 1
+        
+        # 边界检查
+        if start_line < 1:
+            start_line = 1
+        if end_line > total:
+            end_line = total
+        
+        if start_line > end_line:
+            return False, f"起始行({start_line})不能大于结束行({end_line})"
+        
+        # 确保新内容以换行符结尾（如果不是空内容）
+        if content and not content.endswith('\n'):
+            content += '\n'
+        
+        # 将新内容按行分割
+        new_lines = content.split('\n') if content else []
+        # split 会产生一个空字符串作为最后一个元素（如果内容以换行符结尾）
+        if new_lines and new_lines[-1] == '':
+            new_lines = new_lines[:-1]
+        
+        # 为新内容添加换行符
+        new_lines = [line + '\n' for line in new_lines]
+        
+        # 构建新文件内容：保留起始行之前的行 + 新内容 + 结束行之后的行
+        new_file_lines = lines[:start_line - 1] + new_lines + lines[end_line:]
+        
+        # 写回文件
+        with open(path, 'w', encoding='utf-8') as f:
+            f.writelines(new_file_lines)
+        
+        replaced_count = end_line - start_line + 1
+        new_count = len(new_lines)
+        return True, f"替换第 {start_line}-{end_line} 行成功（替换 {replaced_count} 行，新增 {new_count} 行）"
+    except Exception as e:
+        return False, f"替换多行失败: {e}"
+
+
 def search_replace(filepath, old, new, use_regex=False):
     """
     搜索并替换文件内容
@@ -495,10 +637,12 @@ COMMANDS = {
     "move_file": move_file,
     "append_to_file": append_to_file,
     # 精细行操作
+    "file_info": file_info,
     "read_lines": read_lines,
     "insert_line": insert_line,
     "delete_line": delete_line,
     "replace_line": replace_line,
+    "replace_multi_lines": replace_multi_lines,
     "search_replace": search_replace,
     # 目录操作
     "create_dir": create_dir,

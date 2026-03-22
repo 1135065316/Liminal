@@ -23,10 +23,12 @@
 
 | 命令 | 功能说明 | 示例 |
 |------|----------|------|
+| `file_info` | 获取文件信息（行数、大小、修改时间） | `file_info("test.py")` |
 | `read_lines` | 读取指定行范围（带行号显示） | `read_lines("test.py", 1, 10)` |
 | `insert_line` | 在指定行前插入新内容 | `insert_line("test.py", 5, "# 注释")` |
 | `delete_line` | 删除指定行（支持负数从末尾计） | `delete_line("test.py", -1)` |
 | `replace_line` | 替换指定行内容 | `replace_line("test.py", 3, "new_content")` |
+| `replace_multi_lines` | 替换多行内容（-1 表示最后一行） | `replace_multi_lines("test.py", 3, -1, "new_code")` |
 | `search_replace` | 全文搜索替换（支持正则） | `search_replace("test.py", "old", "new")` |
 
 ### 目录操作
@@ -46,6 +48,17 @@
 4. 行号从 1 开始计数，支持负数表示从末尾计数（-1 表示最后一行）
 
 ## 精细行操作详解
+
+### 获取文件信息 `file_info`
+```python
+# 查看文件行数、大小、修改时间
+file_info("test.py")
+# 输出:
+# 文件: test.py
+# 行数: 50
+# 大小: 2.34 KB
+# 修改时间: 2026-03-22 21:10:42
+```
 
 ### 读取行范围 `read_lines`
 ```python
@@ -81,6 +94,24 @@ delete_line("test.py", -1)
 ```python
 # 将第 10 行替换为新内容
 replace_line("test.py", 10, "    return result")
+```
+
+### 替换多行 `replace_multi_lines`
+```python
+# 使用三引号包裹多行内容
+replace_multi_lines("test.py", 3, 10, """    def new_function():
+        print("hello")
+        return True""")
+
+# 使用 -1 表示最后一行，替换到文件末尾
+replace_multi_lines("test.py", 3, -1, "新内容")
+
+# 替换整个文件（从第1行到最后一行）
+replace_multi_lines("test.py", 1, -1, """# 全新内容
+print("hello world")""")
+
+# 删除多行（替换为空内容）
+replace_multi_lines("test.py", 5, 8, "")
 ```
 
 ### 搜索替换 `search_replace`

@@ -52,31 +52,55 @@ def parse_command(cmd_str):
 
 
 def _parse_args(args_str):
-    """
+    '''
     解析参数列表，正确处理引号内的逗号和转义引号
-    支持双引号、单引号和反引号（模板字符串）
+    支持双引号、单引号、反引号、三引号（Python风格）
     
     示例:
         '"test.txt", "hello world"' -> ['test.txt', 'hello world']
         '"demo.py", 1, 10' -> ['demo.py', 1, 10]
-        '"content \\"quoted\\" end"' -> ['content "quoted" end']
         '`content with, commas` -> ['content with, commas']
-    """
+        三引号支持: """...""" 或 单引号单引号单引号...单引号单引号单引号
+    '''
     args = []
     current = ""
     in_quotes = False
     quote_char = None
+    triple_quote = None
     
     i = 0
     while i < len(args_str):
         char = args_str[i]
         
-        if char == '\\' and i + 1 < len(args_str) and args_str[i + 1] in ('"', "'", '`'):
-            # 转义的引号，保留反斜杠，跳过下一个字符的特殊处理
+        # 检测三引号（需要先检查，避免被单引号逻辑拦截）
+        if not in_quotes and i + 2 < len(args_str):
+            three_chars = args_str[i:i+3]
+            if three_chars in ('"""', "'''"):
+                in_quotes = True
+                triple_quote = three_chars
+                current += three_chars
+                i += 2
+                i += 1
+                continue
+        
+        # 检测三引号结束
+        if in_quotes and triple_quote and i + 2 < len(args_str):
+            three_chars = args_str[i:i+3]
+            if three_chars == triple_quote:
+                in_quotes = False
+                triple_quote = None
+                current += three_chars
+                i += 2
+                i += 1
+                continue
+        
+        # 转义的引号（只在非三引号模式下处理，三引号内不处理转义）
+        if not triple_quote and char == '\\' and i + 1 < len(args_str) and args_str[i + 1] in ('"', "'", '`'):
             current += char  # 保留反斜杠
             i += 1
             current += args_str[i]  # 保留引号
-        elif char in ('"', "'", '`'):
+        # 单引号/双引号/反引号（只在非三引号模式下处理）
+        elif not triple_quote and char in ('"', "'", '`'):
             if not in_quotes:
                 in_quotes = True
                 quote_char = char
@@ -87,8 +111,8 @@ def _parse_args(args_str):
                 current += char
             else:
                 current += char
+        # 参数分隔（非引号模式下）
         elif char == ',' and not in_quotes:
-            # 参数分隔
             if current.strip():
                 args.append(_convert_arg(current.strip()))
             current = ""
@@ -108,8 +132,14 @@ def _convert_arg(arg):
     """转换参数为合适类型，处理转义字符"""
     arg = arg.strip()
     
-    # 字符串：去除外层引号（支持双引号、单引号、反引号），并处理转义字符
-    if (len(arg) >= 2 and arg[0] == arg[-1] and arg[0] in ('"', "'", '`')):
+    # 三引号字符串：去除外层三引号（不处理内部转义）
+    if arg.startswith('"""') and arg.endswith('"""') and len(arg) >= 6:
+        return arg[3:-3]
+    if arg.startswith("'''") and arg.endswith("'''") and len(arg) >= 6:
+        return arg[3:-3]
+    
+    # 普通字符串：去除外层引号（支持双引号、单引号、反引号），并处理转义字符
+    if len(arg) >= 2 and arg[0] == arg[-1] and arg[0] in ('"', "'", '`'):
         inner = arg[1:-1]
         # 处理转义字符
         inner = inner.replace('\\n', '\n')  # 换行
@@ -306,13 +336,16 @@ if __name__ == "__main__":
         'read_lines("demo.py", 1, 10)',
         'delete_line("file.txt", -1)',
         'list_dir("./")',
+        # 三引号测试
+        'create_file("test.html", """<html>\n<body>\n</body>\n</html>""")',
+        "create_file('test.py', '''def hello():\n    pass''')",
     ]
     
     print("1. 命令解析测试:")
     for cmd in test_cmds:
         parsed = parse_command(cmd)
         if parsed:
-            print(f"  {cmd}")
+            print(f"  {cmd[:50]}...")
             print(f"    -> 函数: {parsed[0]}, 参数: {parsed[1]}")
     
     print("\n2. 扫描技能:")
