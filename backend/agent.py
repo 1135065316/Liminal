@@ -8,6 +8,11 @@ DeepSeek Agent - 极简自动化执行
 import sys
 from base_ops import WORK_DIR, run_bash
 from deepseek import chat, check_api_key
+from conversation_logger import (
+    generate_conversation_id,
+    save_conversation,
+    get_conversation_summary
+)
 
 
 def main():
@@ -25,7 +30,10 @@ def main():
     if not task:
         return
 
-    print(f"开始执行: {task}\n")
+    # 生成对话ID（基于开始时间的时间戳）
+    conversation_id = generate_conversation_id()
+    print(f"开始执行: {task}")
+    print(f"对话ID: {conversation_id}\n")
 
     # 设置系统提示词
     system_msg = f"""你是自动化 Agent，工作目录: {WORK_DIR}
@@ -39,24 +47,32 @@ def main():
         {"role": "user", "content": f"任务: {task}\n\n请给出第一个 bash 命令:"}
     ]
 
-    max_rounds = 20
-    for i in range(max_rounds):
-        response = chat(messages)
-        
-        if response.startswith("DONE:"):
-            print(f"完成: {response}")
-            return
-        if response.startswith("FAIL:"):
-            print(f"失败: {response}")
-            return
-        
-        output = run_bash(response.strip())
-        print(f"  -> {output[:200]}{'...' if len(output) > 200 else ''}\n")
-        
-        messages.append({"role": "assistant", "content": response})
-        messages.append({"role": "user", "content": f"执行结果:\n{output}\n\n请继续（DONE: 完成 / FAIL: 失败 / 下一个命令）:"})
-
-    print("达到最大轮数限制")
+    try:
+        max_rounds = 20
+        for i in range(max_rounds):
+            response = chat(messages)
+            
+            if response.startswith("DONE:"):
+                print(f"完成: {response}")
+                messages.append({"role": "assistant", "content": response})
+                break
+            if response.startswith("FAIL:"):
+                print(f"失败: {response}")
+                messages.append({"role": "assistant", "content": response})
+                break
+            
+            output = run_bash(response.strip())
+            print(f"  -> {output[:200]}{'...' if len(output) > 200 else ''}\n")
+            
+            messages.append({"role": "assistant", "content": response})
+            messages.append({"role": "user", "content": f"执行结果:\n{output}\n\n请继续（DONE: 完成 / FAIL: 失败 / 下一个命令）:"})
+        else:
+            print("达到最大轮数限制")
+    finally:
+        # 保存对话记录
+        file_path = save_conversation(conversation_id, messages)
+        print(f"\n对话已保存: {file_path}")
+        print(get_conversation_summary(messages))
 
 
 if __name__ == "__main__":

@@ -20,3 +20,6 @@ tmp/
 
 # Local config
 .env.local
+
+# Conversation records
+conversations/
