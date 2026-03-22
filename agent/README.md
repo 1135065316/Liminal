@@ -17,6 +17,7 @@
 │   ├── base_ops.py       # 基础操作（bash 执行、环境配置）
 │   ├── deepseek.py       # DeepSeek API 封装
 │   ├── conversation_logger.py  # 对话记录模块
+│   ├── context_manager.py # 上下文管理（Token计数、中断处理）
 │   └── skills/           # 技能系统
 │       └── file_ops/     # 文件操作技能
 ├── frontend/             # Vue3 + Vite 前端（端口 14514）
@@ -89,4 +90,4 @@ backend/
 ---
 
 **维护者**：Kimi Code CLI  
-**最后更新**：2026-03-22
+**最后更新**：2026-03-22（添加 context_manager 模块说明）

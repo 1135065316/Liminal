@@ -44,6 +44,7 @@
 | DeepSeek 适配 | `backend/deepseek.py` | DeepSeek API 封装 | ✅ 可用 |
 | 对话记录 | `backend/conversation_logger.py` | 保存对话历史 | ✅ 可用 |
 | 文件技能 | `backend/skills/file_ops/` | 文件操作技能（精细行级） | ✅ 可用 |
+| 上下文管理 | `backend/context_manager.py` | Token 计数、上下文限制、中断处理 | ✅ 可用 |
 
 ### 待实现的核心模块
 
@@ -56,6 +57,17 @@
 | 前端控制台 | 可视化集群状态 | 中 |
 
 ## 关键设计决策
+
+### 决策 0：上下文管理独立模块
+
+**背景**：Token 计数、上下文限制检查、Ctrl+C 中断处理最初散落在 agent.py
+
+**决策**：抽取 `context_manager.py` 统一处理
+- `count_tokens()` / `count_messages()`：tiktoken 精确计数（cl100k_base）
+- `check_context_limit()`：128K × 80% 阈值检查
+- `Interruptible`：上下文管理器包装可中断操作
+
+**效果**：agent.py 精简 30+ 行，主逻辑更清晰
 
 ### 决策 1：为什么从 bash 开始？
 
@@ -150,4 +162,4 @@ Agent 输出 -> run_command()
 ---
 
 **维护者**：Kimi Code CLI  
-**最后更新**：2026-03-22
+**最后更新**：2026-03-22（新增 context_manager 模块）
