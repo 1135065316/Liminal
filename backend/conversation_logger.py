@@ -26,12 +26,12 @@ def get_conversation_file(timestamp=None):
     参数:
         timestamp: 时间戳，默认为当前时间
     返回:
-        文件路径，格式：conversations/年_月_日.md
+        文件路径，格式：conversations/年_月_日_时分秒.md
     """
     ensure_dir()
     if timestamp is None:
         timestamp = datetime.now()
-    filename = f"{timestamp.year}_{timestamp.month}_{timestamp.day}.md"
+    filename = f"{timestamp.year}_{timestamp.month}_{timestamp.day}_{timestamp.hour:02d}.{timestamp.minute:02d}.{timestamp.second:02d}.md"
     return CONVERSATION_DIR / filename
 
 

@@ -38,8 +38,9 @@
 
 | 模块 | 文件 | 职责 | 状态 |
 |------|------|------|------|
-| Shell Agent | `backend/agent.py` | 通过 bash 自动化执行任务 | ✅ 可用 |
-| 基础操作 | `backend/base_ops.py` | bash 执行、工作目录管理 | ✅ 可用 |
+| Shell Agent | `backend/agent.py` | 通过 bash/skill 自动化执行任务 | ✅ 可用 |
+| 基础操作 | `backend/base_ops.py` | bash/skill 执行、工作目录管理 | ✅ 可用 |
+| Skill 调度器 | `backend/skill_dispatcher.py` | 解析并路由 skill 命令 | ✅ 可用 |
 | DeepSeek 适配 | `backend/deepseek.py` | DeepSeek API 封装 | ✅ 可用 |
 | 对话记录 | `backend/conversation_logger.py` | 保存对话历史 | ✅ 可用 |
 | 文件技能 | `backend/skills/file_ops/` | 文件操作技能（精细行级） | ✅ 可用 |
@@ -78,6 +79,28 @@
 # 所有模型适配器遵循相同接口
 def chat(messages) -> str
 ```
+
+### 决策 3：Skill 命令自动路由
+
+**背景**：Agent 需要既能执行 bash 又能使用 skill
+
+**决策**：`base_ops.run_command()` 自动识别命令类型
+- Bash 命令：`ls -la`, `cat file.txt`
+- Skill 命令：`create_file("test.txt", "hello")`
+
+**路由逻辑**：
+```
+Agent 输出 -> run_command()
+               │
+               ├── 是 skill 格式? -> skill_dispatcher -> 执行 skill 函数
+               │
+               └── 否则 -> run_bash() -> 执行 shell 命令
+```
+
+**Skill 扫描机制**：
+- 自动扫描 `skills/` 目录下的所有模块
+- 收集各模块 `COMMANDS` 字典中的命令
+- 运行时动态构建命令路由表
 
 ### 决策 3：技能系统分层
 

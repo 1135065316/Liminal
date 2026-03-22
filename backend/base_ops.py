@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 基础操作模块
-包含 bash 命令执行等通用基础操作
+包含 bash 命令执行和 skill 命令调度等通用基础操作
 """
 
 import os
@@ -21,7 +21,9 @@ def run_bash(cmd):
     返回:
         命令输出（stdout + stderr），最多4000字符
     """
-    print(f"  $ {cmd}")
+    # 截断显示，避免输出过长
+    display_cmd = cmd[:50] + "..." if len(cmd) > 50 else cmd
+    print(f"  $ {display_cmd}")
     try:
         result = subprocess.run(
             cmd, shell=True, capture_output=True, text=True,
@@ -35,3 +37,43 @@ def run_bash(cmd):
         return "ERROR: 命令超时"
     except Exception as e:
         return f"ERROR: {e}"
+
+
+def run_command(cmd):
+    """
+    执行命令（自动识别 bash 或 skill 命令）
+    
+    参数:
+        cmd: 命令字符串
+          - bash 命令: ls -la, cat file.txt
+          - skill 命令: create_file("test.txt", "hello")
+    返回:
+        命令执行结果
+    """
+    # 延迟导入避免循环依赖
+    from skill_dispatcher import execute_skill_command, parse_command, scan_skills
+    
+    # 尝试解析为 skill 命令
+    parsed = parse_command(cmd)
+    if parsed:
+        func_name = parsed[0]
+        # 检查命令是否存在
+        commands = scan_skills()
+        if func_name in commands:
+            print(f"  [SKILL] {func_name}(...)")
+            success, result = execute_skill_command(cmd)
+            # 统一输出格式（使用 ASCII 字符避免编码问题）
+            status = "OK" if success else "FAIL"
+            return f"{status}: {result}"
+    
+    # 普通 bash 命令
+    return run_bash(cmd)
+
+
+def get_skill_commands_help():
+    """获取 skill 命令帮助文本"""
+    try:
+        from skill_dispatcher import get_skill_help_text
+        return get_skill_help_text()
+    except Exception:
+        return ""

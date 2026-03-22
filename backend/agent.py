@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 DeepSeek Agent - 极简自动化执行
-基于 'bash is all you need' 理念，输入任务，自动调用 bash 完成
+基于 'bash is all you need' 理念，输入任务，自动调用 bash/skill 完成
 """
 
 import sys
-from base_ops import WORK_DIR, run_bash
+from base_ops import WORK_DIR, run_command, get_skill_commands_help
 from deepseek import chat, check_api_key
 from conversation_logger import (
     generate_conversation_id,
@@ -35,16 +35,29 @@ def main():
     print(f"开始执行: {task}")
     print(f"对话ID: {conversation_id}\n")
 
+    # 获取 skill 命令帮助
+    skill_help = get_skill_commands_help()
+
     # 设置系统提示词
     system_msg = f"""你是自动化 Agent，工作目录: {WORK_DIR}
-你的任务是分析需求，生成 bash 命令来逐步完成任务。
-每次只输出一个 bash 命令（单行或多行），不要解释。
-如果任务完成，输出 DONE: 结果描述
-如果无法完成，输出 FAIL: 原因"""
+你的任务是分析需求，生成命令来逐步完成任务。
+
+你可以使用两种类型的命令：
+1. **Bash 命令**: 普通的 shell 命令，如 `ls -la`, `cat file.txt`
+2. **Skill 命令**: 预定义的文件/代码操作函数，格式为 `函数名(参数1, 参数2, ...)`
+
+规则:
+- 每次只输出一个命令（bash 或 skill），不要解释
+- 优先使用 skill 命令处理文件操作，更精确可靠
+- 如果文件内容很长（超过 5000 字符），请分多次使用 append_to_file 追加写入，而不是一次性写入
+- 如果任务完成，输出 DONE: 结果描述
+- 如果无法完成，输出 FAIL: 原因
+
+{skill_help}"""
 
     messages = [
         {"role": "system", "content": system_msg},
-        {"role": "user", "content": f"任务: {task}\n\n请给出第一个 bash 命令:"}
+        {"role": "user", "content": f"任务: {task}\n\n请给出第一个命令:"}
     ]
 
     try:
@@ -61,7 +74,8 @@ def main():
                 messages.append({"role": "assistant", "content": response})
                 break
             
-            output = run_bash(response.strip())
+            # 使用 run_command 自动识别并执行命令
+            output = run_command(response.strip())
             print(f"  -> {output[:200]}{'...' if len(output) > 200 else ''}\n")
             
             messages.append({"role": "assistant", "content": response})

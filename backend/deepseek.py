@@ -31,7 +31,8 @@ def chat(messages):
     payload = {
         "model": "deepseek-chat",
         "messages": messages,
-        "temperature": 0.3
+        "temperature": 0.3,
+        "max_tokens": 8192  # 设置为最大值 8K，支持复杂代码生成
     }
     try:
         r = requests.post(API_URL, headers=headers, json=payload, timeout=120)
