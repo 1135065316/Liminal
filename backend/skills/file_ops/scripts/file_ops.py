@@ -72,7 +72,15 @@ def read_file(filepath):
         
         # 添加信息头部
         header = f"[文件: {filepath} | 共 {line_count} 行 | {size_str}]\n"
-        return True, header + content
+        
+        # 为每行添加行号
+        lines = content.split('\n')
+        numbered_lines = []
+        for i, line in enumerate(lines, 1):
+            numbered_lines.append(f"#{i}) {line}")
+        numbered_content = '\n'.join(numbered_lines)
+        
+        return True, header + numbered_content
     except Exception as e:
         return False, f"文件读取失败: {e}"
 
@@ -250,7 +258,7 @@ def read_lines(filepath, start=1, end=None):
         for i in range(start - 1, end):
             line_num = i + 1
             line_content = lines[i].rstrip('\n\r')
-            result_lines.append(f"{line_num:4d} | {line_content}")
+            result_lines.append(f"#{line_num}) {line_content}")
         
         header = f"文件: {filepath} (共{total}行，显示第{start}-{end}行)\n"
         header += "-" * 50 + "\n"

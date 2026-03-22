@@ -17,7 +17,7 @@
 | `delete_file` | 删除指定文件 | `delete_file("old.txt")` |
 | `copy_file` | 复制文件到目标路径 | `copy_file("a.txt", "backup/a.txt")` |
 | `move_file` | 移动文件到目标路径 | `move_file("a.txt", "folder/a.txt")` |
-| `append_to_file` | 在文件末尾追加内容 | `append_to_file("log.txt", "新日志\\n")` |
+| `append_to_file` | 在文件末尾追加内容 | `append_to_file("log.txt", """多行内容""")` |
 
 ### 精细行级操作（编程专用）
 
@@ -112,6 +112,19 @@ print("hello world")""")
 
 # 删除多行（替换为空内容）
 replace_multi_lines("test.py", 5, 8, "")
+```
+
+### 追加内容 `append_to_file`
+```python
+# 追加单行内容
+append_to_file("log.txt", "新日志行\n")
+
+# 使用三引号追加多行内容
+append_to_file("test.py", """
+def new_function():
+    print("这是追加的函数")
+    return True
+""")
 ```
 
 ### 搜索替换 `search_replace`
