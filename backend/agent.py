@@ -13,21 +13,10 @@ from conversation_logger import (
     save_conversation,
     get_conversation_summary
 )
-from token_counter import count_messages as estimate_tokens
-
-# 上下文限制配置
-MAX_CONTEXT_TOKENS = 128 * 1024  # 128K
-CONTEXT_LIMIT_THRESHOLD = 0.8    # 80% 阈值
-
-
-def check_context_limit(messages):
-    """检查上下文是否超过限制，返回 (是否超限, 当前tokens, token限制)"""
-    current_tokens = estimate_tokens(messages)
-    token_limit = int(MAX_CONTEXT_TOKENS * CONTEXT_LIMIT_THRESHOLD)
-    if current_tokens >= token_limit:
-        print(f"\n达到上下文长度限制 ({current_tokens}/{token_limit} tokens)，对话结束")
-        return True, current_tokens, token_limit
-    return False, current_tokens, token_limit
+from context_manager import (
+    check_context_limit,
+    Interruptible
+)
 
 
 def main():
@@ -85,7 +74,11 @@ def main():
             if is_limited:
                 break
             
-            response = chat(messages)
+            # 可中断的 API 调用
+            with Interruptible(messages, "API请求") as op:
+                response = chat(messages)
+            if op.interrupted:
+                break
             
             if response.startswith("DONE:"):
                 print(f"完成: {response}")
@@ -96,8 +89,12 @@ def main():
                 messages.append({"role": "assistant", "content": response})
                 break
             
-            # 使用 run_command 自动识别并执行命令
-            output = run_command(response.strip())
+            # 可中断的命令执行
+            with Interruptible(messages, "命令执行") as op:
+                output = run_command(response.strip())
+            if op.interrupted:
+                break
+            
             print(f"  -> {output[:200]}{'...' if len(output) > 200 else ''}\n")
             
             messages.append({"role": "assistant", "content": response})
@@ -105,6 +102,9 @@ def main():
             
             # 显示当前 token 使用情况
             print(f"[上下文: {current_tokens}/{token_limit} tokens]")
+    except KeyboardInterrupt:
+        print("\n\n用户强制退出，正在保存对话...")
+        messages.append({"role": "user", "content": "[用户强制退出]"})
     finally:
         # 保存对话记录
         file_path = save_conversation(conversation_id, messages)
