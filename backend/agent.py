@@ -13,6 +13,21 @@ from conversation_logger import (
     save_conversation,
     get_conversation_summary
 )
+from token_counter import count_messages as estimate_tokens
+
+# 上下文限制配置
+MAX_CONTEXT_TOKENS = 128 * 1024  # 128K
+CONTEXT_LIMIT_THRESHOLD = 0.8    # 80% 阈值
+
+
+def check_context_limit(messages):
+    """检查上下文是否超过限制，返回 (是否超限, 当前tokens, token限制)"""
+    current_tokens = estimate_tokens(messages)
+    token_limit = int(MAX_CONTEXT_TOKENS * CONTEXT_LIMIT_THRESHOLD)
+    if current_tokens >= token_limit:
+        print(f"\n达到上下文长度限制 ({current_tokens}/{token_limit} tokens)，对话结束")
+        return True, current_tokens, token_limit
+    return False, current_tokens, token_limit
 
 
 def main():
@@ -61,8 +76,15 @@ def main():
     ]
 
     try:
-        max_rounds = 20
-        for i in range(max_rounds):
+        round_num = 0
+        while True:
+            round_num += 1
+            
+            # 检查上下文长度
+            is_limited, current_tokens, token_limit = check_context_limit(messages)
+            if is_limited:
+                break
+            
             response = chat(messages)
             
             if response.startswith("DONE:"):
@@ -80,8 +102,9 @@ def main():
             
             messages.append({"role": "assistant", "content": response})
             messages.append({"role": "user", "content": f"执行结果:\n{output}\n\n请继续（DONE: 完成 / FAIL: 失败 / 下一个命令）:"})
-        else:
-            print("达到最大轮数限制")
+            
+            # 显示当前 token 使用情况
+            print(f"[上下文: {current_tokens}/{token_limit} tokens]")
     finally:
         # 保存对话记录
         file_path = save_conversation(conversation_id, messages)
