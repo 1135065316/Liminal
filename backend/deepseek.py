@@ -29,10 +29,10 @@ def chat(messages):
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "deepseek-chat",
+        "model": "deepseek-reasoner",  # 使用 R1 思考模型
         "messages": messages,
         "temperature": 0.3,
-        "max_tokens": 8192  # 设置为最大值 8K，支持复杂代码生成
+        "max_tokens": 64000  # R1 支持最大 64K 输出
     }
     try:
         r = requests.post(API_URL, headers=headers, json=payload, timeout=120)
