@@ -6,7 +6,7 @@ DeepSeek Agent - 极简自动化执行
 """
 
 import sys
-from base_ops import WORK_DIR, run_command, get_skill_commands_help
+from base_ops import WORK_DIR, run_command, get_skill_commands_help, parse_ai_response
 from deepseek import chat, check_api_key
 from conversation_logger import (
     generate_conversation_id,
@@ -38,12 +38,15 @@ def main():
 1. **Bash 命令**: 普通的 shell 命令，如 `ls -la`, `cat file.txt`
 2. **Skill 命令**: 预定义的文件/代码操作函数，格式为 `函数名(参数1, 参数2, ...)`
 
+输出格式（严格JSON）:
+{{"command": "要执行的bash或skill命令", "thought": "你的想法/说明（可选）"}}
+
 规则:
-- 每次只输出一个命令（bash 或 skill），不要解释
-- 优先使用 skill 命令处理文件操作，更精确可靠
-- 如果文件内容很长（超过 5000 字符），请分多次使用 append_to_file 追加写入，而不是一次性写入
-- 如果任务完成，输出 DONE: 结果描述
-- 如果无法完成，输出 FAIL: 原因
+- 必须输出合法的JSON格式
+- command 字段为纯命令，不含任何解释
+- thought 字段可空，用于表达你的想法（会显示给用户）
+- 如果任务完成，command 填 "DONE:结果描述"
+- 如果无法完成，command 填 "FAIL:原因"
 
 {skill_help}"""
 
@@ -80,21 +83,30 @@ def main():
             if op.interrupted:
                 break
             
-            if response.startswith("DONE:"):
-                print(f"完成: {response}")
+            # 解析 AI 响应
+            command, thought, is_json = parse_ai_response(response)
+            # 显示 AI 的想法（如果有）
+            if thought:
+                print(f"  [🤖] {thought}")
+            
+            # 处理 DONE/FAIL
+            if command.startswith("DONE:"):
+                result = command[5:] if len(command) > 5 else "任务完成"
+                print(f"✅ 完成: {result}")
                 messages.append({"role": "assistant", "content": response})
                 user_input = None  # 继续对话，下一轮获取输入
                 continue
             
-            if response.startswith("FAIL:"):
-                print(f"失败: {response}")
+            if command.startswith("FAIL:"):
+                reason = command[5:] if len(command) > 5 else "未知原因"
+                print(f"❌ 失败: {reason}")
                 messages.append({"role": "assistant", "content": response})
                 user_input = None  # 继续对话，下一轮获取输入
                 continue
             
             # 可中断的命令执行
             with Interruptible(messages, "命令执行") as op:
-                output = run_command(response.strip())
+                output = run_command(command)
             if op.interrupted:
                 break
             

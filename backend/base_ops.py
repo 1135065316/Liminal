@@ -7,6 +7,7 @@
 
 import os
 import subprocess
+import json
 
 # 工作目录
 WORK_DIR = os.getcwd()
@@ -77,3 +78,30 @@ def get_skill_commands_help():
         return get_skill_help_text()
     except Exception:
         return ""
+
+
+def parse_ai_response(response):
+    """
+    解析 AI 的 JSON 格式响应
+    
+    返回:
+        (command: str, thought: str, is_json: bool)
+    """
+    response = response.strip()
+    
+    # 尝试解析 JSON
+    try:
+        resp = json.loads(response)
+        if isinstance(resp, dict):
+            command = resp.get("command", "").strip()
+            thought = resp.get("thought", "").strip()
+            return command, thought, True
+    except json.JSONDecodeError:
+        pass
+    
+    # 兼容旧格式：检查是否是 DONE:/FAIL: 格式
+    if response.startswith("DONE:") or response.startswith("FAIL:"):
+        return response, "", False
+    
+    # 兼容旧格式：纯命令
+    return response, "", False
