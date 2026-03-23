@@ -9,7 +9,12 @@ import os
 import shutil
 import glob
 import re
+import sys
 from pathlib import Path
+
+# 添加 backend 目录到路径以导入 base_ops
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+from base_ops import WORK_DIR
 
 
 # ==================== 基础文件操作 ====================
@@ -19,16 +24,19 @@ def create_file(filepath, content=""):
     创建新文件，可指定内容
     
     参数:
-        filepath: 文件路径
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
         content: 文件内容（字符串）
     返回:
         (success: bool, message: str)
     """
     try:
         path = Path(filepath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding='utf-8')
-        return True, f"文件创建成功: {filepath}"
+        return True, f"文件创建成功: {path}"
     except Exception as e:
         return False, f"文件创建失败: {e}"
 
@@ -38,7 +46,7 @@ def read_file(filepath):
     读取文件全部内容（带文件信息头部）
     
     参数:
-        filepath: 文件路径
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
     返回:
         (success: bool, content: str)
     
@@ -48,6 +56,9 @@ def read_file(filepath):
     """
     try:
         path = Path(filepath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件不存在: {filepath}"
         if not path.is_file():
@@ -71,7 +82,7 @@ def read_file(filepath):
             size_str = f"{size_bytes / 1024 / 1024:.2f} MB"
         
         # 添加信息头部
-        header = f"[文件: {filepath} | 共 {line_count} 行 | {size_str}]\n"
+        header = f"[文件: {path} | 共 {line_count} 行 | {size_str}]\n"
         
         # 为每行添加行号
         lines = content.split('\n')
@@ -90,18 +101,21 @@ def delete_file(filepath):
     删除指定文件
     
     参数:
-        filepath: 文件路径
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
     返回:
         (success: bool, message: str)
     """
     try:
         path = Path(filepath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件不存在: {filepath}"
         if not path.is_file():
             return False, f"路径不是文件: {filepath}"
         path.unlink()
-        return True, f"文件删除成功: {filepath}"
+        return True, f"文件删除成功: {path}"
     except Exception as e:
         return False, f"文件删除失败: {e}"
 
@@ -111,14 +125,19 @@ def copy_file(src, dst):
     复制文件到目标路径
     
     参数:
-        src: 源文件路径
-        dst: 目标文件路径
+        src: 源文件路径（相对 WORK_DIR 或绝对路径）
+        dst: 目标文件路径（相对 WORK_DIR 或绝对路径）
     返回:
         (success: bool, message: str)
     """
     try:
         src_path = Path(src)
         dst_path = Path(dst)
+        # 如果是相对路径，基于 WORK_DIR
+        if not src_path.is_absolute():
+            src_path = Path(WORK_DIR) / src_path
+        if not dst_path.is_absolute():
+            dst_path = Path(WORK_DIR) / dst_path
         
         if not src_path.exists():
             return False, f"源文件不存在: {src}"
@@ -127,7 +146,7 @@ def copy_file(src, dst):
         
         dst_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src_path, dst_path)
-        return True, f"文件复制成功: {src} -> {dst}"
+        return True, f"文件复制成功: {src_path} -> {dst_path}"
     except Exception as e:
         return False, f"文件复制失败: {e}"
 
@@ -137,14 +156,19 @@ def move_file(src, dst):
     移动文件到目标路径
     
     参数:
-        src: 源文件路径
-        dst: 目标文件路径
+        src: 源文件路径（相对 WORK_DIR 或绝对路径）
+        dst: 目标文件路径（相对 WORK_DIR 或绝对路径）
     返回:
         (success: bool, message: str)
     """
     try:
         src_path = Path(src)
         dst_path = Path(dst)
+        # 如果是相对路径，基于 WORK_DIR
+        if not src_path.is_absolute():
+            src_path = Path(WORK_DIR) / src_path
+        if not dst_path.is_absolute():
+            dst_path = Path(WORK_DIR) / dst_path
         
         if not src_path.exists():
             return False, f"源文件不存在: {src}"
@@ -153,7 +177,7 @@ def move_file(src, dst):
         
         dst_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(src_path), str(dst_path))
-        return True, f"文件移动成功: {src} -> {dst}"
+        return True, f"文件移动成功: {src_path} -> {dst_path}"
     except Exception as e:
         return False, f"文件移动失败: {e}"
 
@@ -165,7 +189,7 @@ def file_info(filepath):
     获取文件元数据信息
     
     参数:
-        filepath: 文件路径
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
     返回:
         (success: bool, info: str)
     
@@ -174,6 +198,9 @@ def file_info(filepath):
     """
     try:
         path = Path(filepath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件不存在: {filepath}"
         if not path.is_file():
@@ -199,7 +226,7 @@ def file_info(filepath):
         from datetime import datetime
         mtime = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
         
-        info = f"""文件: {filepath}
+        info = f"""文件: {path}
 行数: {line_count}
 大小: {size_str}
 修改时间: {mtime}"""
@@ -214,7 +241,7 @@ def read_lines(filepath, start=1, end=None):
     读取文件指定行范围
     
     参数:
-        filepath: 文件路径
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
         start: 起始行号（从1开始，包含）
         end: 结束行号（包含），None表示到文件末尾
     返回:
@@ -227,6 +254,9 @@ def read_lines(filepath, start=1, end=None):
     """
     try:
         path = Path(filepath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件不存在: {filepath}"
         
@@ -260,7 +290,7 @@ def read_lines(filepath, start=1, end=None):
             line_content = lines[i].rstrip('\n\r')
             result_lines.append(f"#{line_num}) {line_content}")
         
-        header = f"文件: {filepath} (共{total}行，显示第{start}-{end}行)\n"
+        header = f"文件: {path} (共{total}行，显示第{start}-{end}行)\n"
         header += "-" * 50 + "\n"
         return True, header + "\n".join(result_lines)
     except Exception as e:
@@ -272,7 +302,7 @@ def insert_line(filepath, line_num, content):
     在指定行前插入新内容
     
     参数:
-        filepath: 文件路径
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
         line_num: 插入位置（从1开始），在该行之前插入
         content: 要插入的内容（字符串，不含换行符会自动添加）
     返回:
@@ -284,6 +314,9 @@ def insert_line(filepath, line_num, content):
     """
     try:
         path = Path(filepath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件不存在: {filepath}"
         
@@ -322,7 +355,7 @@ def delete_line(filepath, line_num):
     删除指定行
     
     参数:
-        filepath: 文件路径
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
         line_num: 要删除的行号（从1开始，支持负数表示从末尾计数）
     返回:
         (success: bool, message: str)
@@ -333,6 +366,9 @@ def delete_line(filepath, line_num):
     """
     try:
         path = Path(filepath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件不存在: {filepath}"
         
@@ -369,7 +405,7 @@ def replace_line(filepath, line_num, content):
     替换指定行的内容
     
     参数:
-        filepath: 文件路径
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
         line_num: 要替换的行号（从1开始，支持负数）
         content: 新内容（字符串，不含换行符）
     返回:
@@ -380,6 +416,9 @@ def replace_line(filepath, line_num, content):
     """
     try:
         path = Path(filepath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件不存在: {filepath}"
         
@@ -420,7 +459,7 @@ def replace_multi_lines(filepath, start_line, end_line, content):
     替换多行内容（将指定范围的行替换为新内容）
     
     参数:
-        filepath: 文件路径
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
         start_line: 起始行号（从1开始，包含），支持 -1 表示最后一行
         end_line: 结束行号（包含），支持 -1 表示最后一行，必须 >= start_line
         content: 新内容（字符串，可包含多行）
@@ -433,6 +472,9 @@ def replace_multi_lines(filepath, start_line, end_line, content):
     """
     try:
         path = Path(filepath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件不存在: {filepath}"
         
@@ -490,7 +532,7 @@ def search_replace(filepath, old, new, use_regex=False):
     搜索并替换文件内容
     
     参数:
-        filepath: 文件路径
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
         old: 要搜索的内容（或正则表达式）
         new: 替换为的内容
         use_regex: 是否使用正则表达式，默认False
@@ -503,6 +545,9 @@ def search_replace(filepath, old, new, use_regex=False):
     """
     try:
         path = Path(filepath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件不存在: {filepath}"
         
@@ -536,20 +581,23 @@ def append_to_file(filepath, content):
     在文件末尾追加内容
     
     参数:
-        filepath: 文件路径
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
         content: 要追加的内容
     返回:
         (success: bool, message: str)
     """
     try:
         path = Path(filepath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件不存在: {filepath}"
         
         with open(path, 'a', encoding='utf-8') as f:
             f.write(content)
         
-        return True, f"内容追加成功: {filepath}"
+        return True, f"内容追加成功: {path}"
     except Exception as e:
         return False, f"追加内容失败: {e}"
 
@@ -557,33 +605,42 @@ def append_to_file(filepath, content):
 # ==================== 目录操作 ====================
 
 def create_dir(dirpath):
-    """创建文件夹"""
+    """创建文件夹（相对 WORK_DIR 或绝对路径）"""
     try:
         path = Path(dirpath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         path.mkdir(parents=True, exist_ok=True)
-        return True, f"文件夹创建成功: {dirpath}"
+        return True, f"文件夹创建成功: {path}"
     except Exception as e:
         return False, f"文件夹创建失败: {e}"
 
 
 def delete_dir(dirpath):
-    """删除文件夹（含内容）"""
+    """删除文件夹（含内容）（相对 WORK_DIR 或绝对路径）"""
     try:
         path = Path(dirpath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件夹不存在: {dirpath}"
         if not path.is_dir():
             return False, f"路径不是文件夹: {dirpath}"
         shutil.rmtree(path)
-        return True, f"文件夹删除成功: {dirpath}"
+        return True, f"文件夹删除成功: {path}"
     except Exception as e:
         return False, f"文件夹删除失败: {e}"
 
 
 def list_dir(dirpath="./"):
-    """列出目录内容"""
+    """列出目录内容（相对 WORK_DIR 或绝对路径）"""
     try:
         path = Path(dirpath)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件夹不存在: {dirpath}"
         if not path.is_dir():
@@ -611,9 +668,12 @@ def list_dir(dirpath="./"):
 
 
 def search_files(pattern, search_path="./"):
-    """按名称搜索文件"""
+    """按名称搜索文件（相对 WORK_DIR 或绝对路径）"""
     try:
         path = Path(search_path)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"搜索路径不存在: {search_path}"
         if not path.is_dir():
