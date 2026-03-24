@@ -400,60 +400,6 @@ def delete_line(filepath, line_num):
         return False, f"删除行失败: {e}"
 
 
-def replace_line(filepath, line_num, content):
-    """
-    替换指定行的内容
-    
-    参数:
-        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
-        line_num: 要替换的行号（从1开始，支持负数）
-        content: 新内容（字符串，不含换行符）
-    返回:
-        (success: bool, message: str)
-    
-    示例:
-        replace_line("test.py", 5, "    print('new')")
-    """
-    try:
-        path = Path(filepath)
-        # 如果是相对路径，基于 WORK_DIR
-        if not path.is_absolute():
-            path = Path(WORK_DIR) / path
-        if not path.exists():
-            return False, f"文件不存在: {filepath}"
-        
-        with open(path, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-        
-        total = len(lines)
-        if total == 0:
-            return False, "文件为空"
-        
-        # 处理负数行号
-        if line_num < 0:
-            line_num = total + line_num + 1
-        
-        if line_num < 1 or line_num > total:
-            return False, f"行号 {line_num} 超出范围(1-{total})"
-        
-        # 记录旧内容
-        old_content = lines[line_num - 1].rstrip('\n\r')
-        
-        # 确保新内容以换行符结尾
-        if not content.endswith('\n'):
-            content += '\n'
-        
-        # 替换
-        lines[line_num - 1] = content
-        
-        with open(path, 'w', encoding='utf-8') as f:
-            f.writelines(lines)
-        
-        return True, f"替换第 {line_num} 行成功\n原内容: {old_content[:50]}{'...' if len(old_content) > 50 else ''}"
-    except Exception as e:
-        return False, f"替换行失败: {e}"
-
-
 def replace_multi_lines(filepath, start_line, end_line, content):
     """
     替换多行内容（将指定范围的行替换为新内容）
@@ -709,7 +655,6 @@ COMMANDS = {
     "read_lines": read_lines,
     "insert_line": insert_line,
     "delete_line": delete_line,
-    "replace_line": replace_line,
     "replace_multi_lines": replace_multi_lines,
     "search_replace": search_replace,
     # 目录操作

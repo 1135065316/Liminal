@@ -27,7 +27,6 @@
 | `read_lines` | 读取指定行范围（带行号显示） | `read_lines("test.py", 1, 10)` |
 | `insert_line` | 在指定行前插入新内容 | `insert_line("test.py", 5, "# 注释")` |
 | `delete_line` | 删除指定行（支持负数从末尾计） | `delete_line("test.py", -1)` |
-| `replace_line` | 替换指定行内容 | `replace_line("test.py", 3, "new_content")` |
 | `replace_multi_lines` | 替换多行内容（-1 表示最后一行） | `replace_multi_lines("test.py", 3, -1, "new_code")` |
 | `search_replace` | 全文搜索替换（支持正则） | `search_replace("test.py", "old", "new")` |
 
@@ -88,12 +87,6 @@ delete_line("test.py", 5)
 
 # 删除最后一行
 delete_line("test.py", -1)
-```
-
-### 替换行 `replace_line`
-```python
-# 将第 10 行替换为新内容
-replace_line("test.py", 10, "    return result")
 ```
 
 ### 替换多行 `replace_multi_lines`
