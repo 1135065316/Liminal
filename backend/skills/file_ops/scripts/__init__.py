@@ -15,9 +15,11 @@ from .file_ops import (
     # 精细行操作
     read_lines,
     insert_line,
+    append_to_line,
     delete_line,
-    replace_line,
+    replace_batch,
     search_replace,
+    undo_file,
     # 目录操作
     create_dir,
     delete_dir,
@@ -39,9 +41,11 @@ __all__ = [
     # 精细行操作
     "read_lines",
     "insert_line",
+    "append_to_line",
     "delete_line",
-    "replace_line",
+    "replace_batch",
     "search_replace",
+    "undo_file",
     # 目录操作
     "create_dir",
     "delete_dir",

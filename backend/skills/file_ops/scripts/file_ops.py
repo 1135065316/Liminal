@@ -17,11 +17,75 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 from base_ops import WORK_DIR
 
 
+# ==================== 文件备份管理 ====================
+# 存储文件备份 {filepath: backup_content}
+_file_backups = {}
+
+
+def backup_file(filepath):
+    """
+    备份文件内容（供 undo 使用）
+    
+    参数:
+        filepath: 文件路径
+    返回:
+        bool: 是否成功
+    """
+    try:
+        path = Path(filepath)
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
+        
+        if not path.exists() or not path.is_file():
+            return False
+        
+        # 读取并存储备份
+        content = path.read_text(encoding='utf-8')
+        _file_backups[str(path)] = content
+        return True
+    except Exception:
+        return False
+
+
+def undo_file(filepath):
+    """
+    撤销最后一次修改（恢复到备份状态）
+    
+    参数:
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
+    返回:
+        (success: bool, message: str)
+    
+    示例:
+        undo_file("test.py")  # 恢复到上次备份的状态
+    """
+    try:
+        path = Path(filepath)
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
+        
+        path_str = str(path)
+        
+        if path_str not in _file_backups:
+            return False, "没有可用的备份（每次修改前会自动备份）"
+        
+        # 恢复备份
+        content = _file_backups[path_str]
+        path.write_text(content, encoding='utf-8')
+        
+        # 清除备份（一次 undo 后不能重复 undo）
+        del _file_backups[path_str]
+        
+        return True, f"文件已恢复到上次备份状态: {filepath}"
+    except Exception as e:
+        return False, f"撤销失败: {e}"
+
+
 # ==================== 基础文件操作 ====================
 
 def create_file(filepath, content=""):
     """
-    创建新文件，可指定内容
+    创建新文件，可指定内容（如果文件已存在会先备份）
     
     参数:
         filepath: 文件路径（相对 WORK_DIR 或绝对路径）
@@ -34,6 +98,10 @@ def create_file(filepath, content=""):
         # 如果是相对路径，基于 WORK_DIR
         if not path.is_absolute():
             path = Path(WORK_DIR) / path
+        
+        # 如果文件已存在，先备份
+        if path.exists():
+            backup_file(filepath)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding='utf-8')
         return True, f"文件创建成功: {path}"
@@ -236,21 +304,24 @@ def file_info(filepath):
         return False, f"获取文件信息失败: {e}"
 
 
-def read_lines(filepath, start=1, end=None):
+def read_lines(filepath, start=1, end=None, context=10):
     """
-    读取文件指定行范围
+    读取文件指定行范围（智能默认值）
     
     参数:
         filepath: 文件路径（相对 WORK_DIR 或绝对路径）
-        start: 起始行号（从1开始，包含）
-        end: 结束行号（包含），None表示到文件末尾
+        start: 起始行号（从1开始，包含），默认为1
+        end: 结束行号（包含），None表示自动计算
+        context: 当end为None时，读取start后的context行（默认10行）
     返回:
         (success: bool, content: str)
     
     示例:
-        read_lines("test.py", 1, 10)      # 读取1-10行
-        read_lines("test.py", 5, 5)       # 只读第5行
-        read_lines("test.py", 20)         # 读取20行到末尾
+        read_lines("test.py")             # 读取前10行（默认）
+        read_lines("test.py", 5)          # 读取5-15行（默认上下文10行）
+        read_lines("test.py", 5, 20)      # 读取5-20行
+        read_lines("test.py", -10)        # 读取最后10行
+        read_lines("test.py", 5, context=5)  # 读取5-10行
     """
     try:
         path = Path(filepath)
@@ -270,14 +341,21 @@ def read_lines(filepath, start=1, end=None):
         # 处理负数行号（从末尾计数）
         if start < 0:
             start = total + start + 1
-        if end is not None and end < 0:
-            end = total + end + 1
         
         # 边界检查
         start = max(1, min(start, total))
+        
+        # 智能计算 end
         if end is None:
-            end = total
+            # 如果 start 接近文件末尾，则显示剩余所有行
+            if start + context > total:
+                end = total
+            else:
+                end = start + context - 1
         else:
+            # 处理负数的 end
+            if end < 0:
+                end = total + end + 1
             end = max(1, min(end, total))
         
         if start > end:
@@ -299,7 +377,7 @@ def read_lines(filepath, start=1, end=None):
 
 def insert_line(filepath, line_num, content):
     """
-    在指定行前插入新内容
+    在指定行前插入新内容（自动备份）
     
     参数:
         filepath: 文件路径（相对 WORK_DIR 或绝对路径）
@@ -350,19 +428,79 @@ def insert_line(filepath, line_num, content):
         return False, f"插入行失败: {e}"
 
 
-def delete_line(filepath, line_num):
+def append_to_line(filepath, line_num, content):
     """
-    删除指定行
+    在指定行后追加内容（自动备份）
     
     参数:
         filepath: 文件路径（相对 WORK_DIR 或绝对路径）
-        line_num: 要删除的行号（从1开始，支持负数表示从末尾计数）
+        line_num: 追加位置（从1开始），在该行之后追加
+        content: 要追加的内容（字符串，不含换行符会自动添加）
     返回:
         (success: bool, message: str)
     
     示例:
+        append_to_line("test.py", 5, "    print('debug')")  # 在第5行后追加
+        append_to_line("test.py", -1, "# EOF")  # 在最后一行后追加（文件末尾）
+    """
+    try:
+        path = Path(filepath)
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
+        if not path.exists():
+            return False, f"文件不存在: {filepath}"
+        
+        # 备份原文件
+        backup_file(filepath)
+        
+        with open(path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        total = len(lines)
+        
+        # 处理负数行号
+        if line_num < 0:
+            line_num = total + line_num + 1
+        
+        # 边界检查：可以在文件末尾追加（line_num = total）
+        if line_num < 0:
+            line_num = 0
+        if line_num > total:
+            line_num = total
+        
+        # 确保内容以换行符结尾
+        if not content.endswith('\n'):
+            content += '\n'
+        
+        # 在当前行之后插入（行号就是索引位置，因为 insert 是在指定索引前插入）
+        lines.insert(line_num, content)
+        
+        with open(path, 'w', encoding='utf-8') as f:
+            f.writelines(lines)
+        
+        return True, f"在第 {line_num} 行后追加成功，文件现在共 {len(lines)} 行"
+    except Exception as e:
+        return False, f"追加行失败: {e}"
+
+
+def delete_line(filepath, *line_nums):
+    """
+    删除指定行（支持批量删除，自动处理行号偏移，自动备份）
+    
+    参数:
+        filepath: 文件路径（相对 WORK_DIR 或绝对路径）
+        *line_nums: 要删除的行号（从1开始，支持负数表示从末尾计数）
+    返回:
+        (success: bool, message: str)
+    
+    示例:
+        # 删除单行
         delete_line("test.py", 3)    # 删除第3行
         delete_line("test.py", -1)   # 删除最后一行
+        
+        # 批量删除多行（自动从后往前处理，避免行号偏移）
+        delete_line("test.py", 3, 10, 15)  # 删除第3、10、15行
+        delete_line("test.py", -1, -3, -5)  # 删除最后1、3、5行
     """
     try:
         path = Path(filepath)
@@ -371,6 +509,9 @@ def delete_line(filepath, line_num):
             path = Path(WORK_DIR) / path
         if not path.exists():
             return False, f"文件不存在: {filepath}"
+        
+        # 备份原文件
+        backup_file(filepath)
         
         with open(path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
@@ -379,42 +520,68 @@ def delete_line(filepath, line_num):
         if total == 0:
             return False, "文件为空，无法删除"
         
-        # 处理负数行号
-        if line_num < 0:
-            line_num = total + line_num + 1
+        if not line_nums:
+            return False, "请至少指定一个要删除的行号"
         
-        if line_num < 1 or line_num > total:
-            return False, f"行号 {line_num} 超出范围(1-{total})"
+        # 处理所有行号（包括负数）
+        processed_lines = []
+        for i, line_num in enumerate(line_nums):
+            # 处理负数行号
+            if line_num < 0:
+                line_num = total + line_num + 1
+            
+            # 边界检查
+            if line_num < 1 or line_num > total:
+                return False, f"第 {i+1} 个行号 {line_num} 超出范围(1-{total})"
+            
+            processed_lines.append(line_num)
         
-        # 记录被删除的内容
-        deleted_content = lines[line_num - 1].rstrip('\n\r')
+        # 检查重复行号
+        if len(set(processed_lines)) != len(processed_lines):
+            return False, "存在重复的行号"
         
-        # 删除指定行
-        del lines[line_num - 1]
+        # 按行号从大到小排序（从后往前删除，避免行号变化）
+        processed_lines.sort(reverse=True)
         
+        # 执行删除
+        deleted_info = []
+        for line_num in processed_lines:
+            # 记录被删除的内容（注意：行号在删除过程中会变化，但排序后从后往前删是安全的）
+            deleted_content = lines[line_num - 1].rstrip('\n\r')
+            deleted_info.append((line_num, deleted_content[:30]))
+            # 删除指定行
+            del lines[line_num - 1]
+        
+        # 写回文件
         with open(path, 'w', encoding='utf-8') as f:
             f.writelines(lines)
         
-        return True, f"删除第 {line_num} 行成功，删除内容: {deleted_content[:50]}{'...' if len(deleted_content) > 50 else ''}"
+        # 构建结果信息
+        deleted_lines_str = ", ".join([str(ln) for ln in sorted(processed_lines)])
+        return True, f"删除成功，共删除 {len(processed_lines)} 行（行号: {deleted_lines_str}）"
     except Exception as e:
         return False, f"删除行失败: {e}"
 
 
-def replace_multi_lines(filepath, start_line, end_line, content):
+def replace_batch(filepath, *replacements):
     """
-    替换多行内容（将指定范围的行替换为新内容）
+    批量替换多行内容（自动处理行号偏移，按从后往前的顺序执行，自动备份）
     
     参数:
         filepath: 文件路径（相对 WORK_DIR 或绝对路径）
-        start_line: 起始行号（从1开始，包含），支持 -1 表示最后一行
-        end_line: 结束行号（包含），支持 -1 表示最后一行，必须 >= start_line
-        content: 新内容（字符串，可包含多行）
+        *replacements: 替换参数，支持两种格式：
+            格式1 - 元组形式：replace_batch("file", (start, end, content), (start2, end2, content2))
+            格式2 - 平铺形式：replace_batch("file", start, end, content, start2, end2, content2)
     返回:
         (success: bool, message: str)
     
     示例:
-        replace_multi_lines("test.py", 3, 10, "    # 新代码块\n    pass")
-        replace_multi_lines("test.py", 1, -1, "新内容")  # 替换整个文件
+        # 格式1：元组形式（推荐用于批量替换）
+        replace_batch("test.py", (3, 10, "content"), (15, 20, "content2"))
+        
+        # 格式2：平铺形式（更简洁）
+        replace_batch("test.py", 3, 10, "content")
+        replace_batch("test.py", 3, 10, "content1", 15, 20, "content2")
     """
     try:
         path = Path(filepath)
@@ -424,6 +591,9 @@ def replace_multi_lines(filepath, start_line, end_line, content):
         if not path.exists():
             return False, f"文件不存在: {filepath}"
         
+        # 备份原文件
+        backup_file(filepath)
+        
         with open(path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
         
@@ -431,51 +601,90 @@ def replace_multi_lines(filepath, start_line, end_line, content):
         if total == 0:
             return False, "文件为空"
         
-        # 处理负数行号
-        if start_line < 0:
-            start_line = total + start_line + 1
-        if end_line < 0:
-            end_line = total + end_line + 1
+        # 解析替换参数（支持元组形式和平铺形式）
+        parsed_replacements = []
         
-        # 边界检查
-        if start_line < 1:
-            start_line = 1
-        if end_line > total:
-            end_line = total
+        if len(replacements) == 0:
+            return False, "请至少提供一个替换参数"
         
-        if start_line > end_line:
-            return False, f"起始行({start_line})不能大于结束行({end_line})"
+        # 检测参数格式
+        if isinstance(replacements[0], (tuple, list)):
+            # 格式1：元组形式 (start, end, content), (start2, end2, content2)
+            for i, repl in enumerate(replacements):
+                if len(repl) != 3:
+                    return False, f"第 {i+1} 个替换元组必须有3个元素 (start, end, content)"
+                start_line, end_line, content = repl
+                parsed_replacements.append((start_line, end_line, content))
+        else:
+            # 格式2：平铺形式 start, end, content, start2, end2, content2
+            if len(replacements) % 3 != 0:
+                return False, f"平铺格式参数数量必须是3的倍数（start, end, content），当前有 {len(replacements)} 个参数"
+            for i in range(0, len(replacements), 3):
+                start_line = replacements[i]
+                end_line = replacements[i + 1]
+                content = replacements[i + 2]
+                parsed_replacements.append((start_line, end_line, content))
         
-        # 确保新内容以换行符结尾（如果不是空内容）
-        if content and not content.endswith('\n'):
-            content += '\n'
+        # 转换替换列表并处理负数行号
+        processed_replacements = []
+        for i, (start_line, end_line, content) in enumerate(parsed_replacements):
+            # 处理负数行号
+            if start_line < 0:
+                start_line = total + start_line + 1
+            if end_line < 0:
+                end_line = total + end_line + 1
+            
+            # 边界检查
+            if start_line < 1:
+                start_line = 1
+            if end_line > total:
+                end_line = total
+            
+            if start_line > end_line:
+                return False, f"第 {i+1} 个替换：起始行({start_line})不能大于结束行({end_line})"
+            
+            # 确保新内容以换行符结尾
+            if content and not content.endswith('\n'):
+                content += '\n'
+            
+            processed_replacements.append((start_line, end_line, content))
         
-        # 将新内容按行分割
-        new_lines = content.split('\n') if content else []
-        # split 会产生一个空字符串作为最后一个元素（如果内容以换行符结尾）
-        if new_lines and new_lines[-1] == '':
-            new_lines = new_lines[:-1]
+        # 按起始行号从后往前排序（大的行号先处理，避免行号偏移）
+        processed_replacements.sort(key=lambda x: x[0], reverse=True)
         
-        # 为新内容添加换行符
-        new_lines = [line + '\n' for line in new_lines]
+        # 检查替换区域是否有重叠
+        # 按start从大到小排序后，curr在next后面，不重叠的条件是 curr_start > next_end
+        for i in range(len(processed_replacements) - 1):
+            curr_start, curr_end, _ = processed_replacements[i]  # 当前（行号大的）
+            next_start, next_end, _ = processed_replacements[i + 1]  # 下一个（行号小的）
+            if curr_start <= next_end:  #  curr的起点在next的终点之前或相等，则重叠
+                return False, f"替换区域重叠：第 {next_start}-{next_end} 行与第 {curr_start}-{curr_end} 行"
         
-        # 构建新文件内容：保留起始行之前的行 + 新内容 + 结束行之后的行
-        new_file_lines = lines[:start_line - 1] + new_lines + lines[end_line:]
+        # 执行替换
+        for start_line, end_line, content in processed_replacements:
+            # 将新内容按行分割
+            new_lines = content.split('\n') if content else []
+            if new_lines and new_lines[-1] == '':
+                new_lines = new_lines[:-1]
+            new_lines = [line + '\n' for line in new_lines]
+            
+            # 执行替换
+            lines = lines[:start_line - 1] + new_lines + lines[end_line:]
         
         # 写回文件
         with open(path, 'w', encoding='utf-8') as f:
-            f.writelines(new_file_lines)
+            f.writelines(lines)
         
-        replaced_count = end_line - start_line + 1
-        new_count = len(new_lines)
-        return True, f"替换第 {start_line}-{end_line} 行成功（替换 {replaced_count} 行，新增 {new_count} 行）"
+        # 构建结果信息
+        repl_info = ", ".join([f"{s}-{e}" for s, e, _ in sorted(processed_replacements, key=lambda x: x[0])])
+        return True, f"批量替换成功：{repl_info}"
     except Exception as e:
-        return False, f"替换多行失败: {e}"
+        return False, f"批量替换失败: {e}"
 
 
 def search_replace(filepath, old, new, use_regex=False):
     """
-    搜索并替换文件内容
+    搜索并替换文件内容（自动备份）
     
     参数:
         filepath: 文件路径（相对 WORK_DIR 或绝对路径）
@@ -502,6 +711,9 @@ def search_replace(filepath, old, new, use_regex=False):
         
         original = content
         
+        # 备份原文件
+        backup_file(filepath)
+        
         if use_regex:
             # 正则替换
             new_content, count = re.subn(old, new, content)
@@ -524,7 +736,7 @@ def search_replace(filepath, old, new, use_regex=False):
 
 def append_to_file(filepath, content):
     """
-    在文件末尾追加内容
+    在文件末尾追加内容（自动备份）
     
     参数:
         filepath: 文件路径（相对 WORK_DIR 或绝对路径）
@@ -654,9 +866,11 @@ COMMANDS = {
     "file_info": file_info,
     "read_lines": read_lines,
     "insert_line": insert_line,
+    "append_to_line": append_to_line,
     "delete_line": delete_line,
-    "replace_multi_lines": replace_multi_lines,
+    "replace_batch": replace_batch,
     "search_replace": search_replace,
+    "undo_file": undo_file,
     # 目录操作
     "create_dir": create_dir,
     "delete_dir": delete_dir,
