@@ -12,8 +12,8 @@ import sys
 import re
 from pathlib import Path
 
-# skills 目录路径
-SKILLS_DIR = Path(__file__).parent / "skills"
+# skills 目录路径 (从 core 目录返回上一级到 backend)
+SKILLS_DIR = Path(__file__).parent.parent / "skills"
 
 
 def parse_command(cmd_str):

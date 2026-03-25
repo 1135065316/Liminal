@@ -10,7 +10,8 @@ import subprocess
 import json
 
 # 工作目录
-WORK_DIR = os.getcwd()
+# WORK_DIR = os.getcwd()
+WORK_DIR = r'C:\Users\15546\Desktop\新建文件夹 (3)'
 
 
 def run_bash(cmd):

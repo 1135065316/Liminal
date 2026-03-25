@@ -188,6 +188,98 @@ def delete_file(filepath):
         return False, f"文件删除失败: {e}"
 
 
+def delete_files(*filepaths):
+    """
+    批量删除多个文件
+    
+    参数:
+        *filepaths: 一个或多个文件路径（相对 WORK_DIR 或绝对路径）
+    返回:
+        (success: bool, message: str)
+    
+    示例:
+        delete_files("file1.txt", "file2.txt")           # 删除2个文件
+        delete_files("logs/a.log", "logs/b.log")         # 删除指定文件
+    """
+    if not filepaths:
+        return False, "请至少指定一个要删除的文件"
+    
+    success_list = []
+    fail_list = []
+    
+    for filepath in filepaths:
+        success, msg = delete_file(filepath)
+        if success:
+            success_list.append(filepath)
+        else:
+            fail_list.append(f"{filepath}: {msg}")
+    
+    result_parts = []
+    if success_list:
+        result_parts.append(f"成功删除 {len(success_list)} 个文件: {', '.join(success_list)}")
+    if fail_list:
+        result_parts.append(f"失败 {len(fail_list)} 个:\n" + "\n".join(fail_list))
+    
+    final_success = len(fail_list) == 0
+    return final_success, "\n".join(result_parts)
+
+
+def delete_files_by_pattern(pattern, search_path="./"):
+    """
+    按名称模式批量删除文件（支持通配符）
+    
+    参数:
+        pattern: 匹配模式，支持通配符 * ?，如 "*.log", "test_*.py", "*.tmp"
+        search_path: 搜索路径，默认为当前目录
+    返回:
+        (success: bool, message: str)
+    
+    示例:
+        delete_files_by_pattern("*.log")                    # 删除当前目录所有 .log 文件
+        delete_files_by_pattern("*.tmp", "./temp")          # 删除 temp 目录所有 .tmp 文件
+        delete_files_by_pattern("test_*.py")                # 删除 test_ 开头的 py 文件
+        delete_files_by_pattern("*.bak", "./backup")        # 删除 backup 目录的 .bak 文件
+    """
+    try:
+        path = Path(search_path)
+        # 如果是相对路径，基于 WORK_DIR
+        if not path.is_absolute():
+            path = Path(WORK_DIR) / path
+        if not path.exists():
+            return False, f"搜索路径不存在: {search_path}"
+        if not path.is_dir():
+            return False, f"搜索路径不是文件夹: {search_path}"
+        
+        # 查找匹配的文件（不包括目录）
+        matches = [f for f in path.rglob(pattern) if f.is_file()]
+        
+        if not matches:
+            return True, f"未找到匹配 '{pattern}' 的文件"
+        
+        # 批量删除
+        success_list = []
+        fail_list = []
+        
+        for match in matches:
+            rel_path = str(match.relative_to(path))
+            success, msg = delete_file(str(match))
+            if success:
+                success_list.append(rel_path)
+            else:
+                fail_list.append(f"{rel_path}: {msg}")
+        
+        result_parts = []
+        if success_list:
+            result_parts.append(f"成功删除 {len(success_list)} 个文件: {', '.join(success_list)}")
+        if fail_list:
+            result_parts.append(f"失败 {len(fail_list)} 个:\n" + "\n".join(fail_list))
+        
+        final_success = len(fail_list) == 0
+        return final_success, "\n".join(result_parts)
+    except Exception as e:
+        return False, f"按模式删除失败: {e}"
+
+
 def copy_file(src, dst):
     """
     复制文件到目标路径
@@ -859,6 +951,8 @@ COMMANDS = {
     "create_file": create_file,
     "read_file": read_file,
     "delete_file": delete_file,
+    "delete_files": delete_files,
+    "delete_files_by_pattern": delete_files_by_pattern,
     "copy_file": copy_file,
     "move_file": move_file,
     "append_to_file": append_to_file,

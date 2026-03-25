@@ -6,6 +6,14 @@
 
 支持的操作系统：Windows / Linux / macOS
 
+## 注意事项
+
+1. 诸如replace_batch之类的操作可能导致行号变动, 可以一次性替换多段, 操作完之后应重新read_file查看新的内容结构
+2. 所有路径支持相对路径和绝对路径
+3. 操作前会自动检查权限和路径有效性
+4. 删除操作不可逆，请谨慎使用
+5. 行号从 1 开始计数，支持负数表示从末尾计数（-1 表示最后一行）
+
 ## 命令介绍
 
 ### 基础文件操作
@@ -15,6 +23,8 @@
 | `create_file` | 创建新文件，可指定内容 | `create_file("test.txt", """hello""")` |
 | `read_file` | 读取文件全部内容 | `read_file("test.txt")` |
 | `delete_file` | 删除指定文件 | `delete_file("old.txt")` |
+| `delete_files` | 批量删除多个文件 | `delete_files("a.txt", "b.txt", "c.txt")` |
+| `delete_files_by_pattern` | 按通配符模式删除文件 | `delete_files_by_pattern("*.log", "./logs")` |
 | `copy_file` | 复制文件到目标路径 | `copy_file("a.txt", "backup/a.txt")` |
 | `move_file` | 移动文件到目标路径 | `move_file("a.txt", "folder/a.txt")` |
 | `append_to_file` | 在文件末尾追加内容 | `append_to_file("log.txt", """多行内容""")` |
@@ -41,14 +51,7 @@
 | `list_dir` | 列出目录内容 | `list_dir("./")` |
 | `search_files` | 按名称搜索文件 | `search_files("*.py", "./src")` |
 
-## 使用说明
-
-1. 所有路径支持相对路径和绝对路径
-2. 操作前会自动检查权限和路径有效性
-3. 删除操作不可逆，请谨慎使用
-4. 行号从 1 开始计数，支持负数表示从末尾计数（-1 表示最后一行）
-
-## 精细行操作详解
+## 操作详解
 
 ### 获取文件信息 `file_info`
 ```python
@@ -202,63 +205,3 @@ search_replace("test.py",
     use_regex=True)
 ```
 
-## 使用示例
-
-```python
-from scripts import file_ops
-
-# 创建 Python 文件（使用三引号编写多行内容）
-file_ops.create_file("demo.py", '''# Demo
-def hello():
-    print("Hello World")
-    return True
-
-def greet(name):
-    print(f"Hello, {name}!")
-    return name
-''')
-
-# 查看第 2-5 行（智能读取，不传end默认读10行）
-ok, content = file_ops.read_lines("demo.py", 2)
-print(content)
-
-# 在函数前插入文档字符串
-file_ops.insert_line("demo.py", 3, '''    """
-    打印问候语
-    """''')
-
-# 在函数后追加代码
-file_ops.append_to_line("demo.py", 6, "    print('Function end')")
-
-# 批量替换多个函数
-file_ops.replace_batch("demo.py",
-    (2, 4, '''def hello_world():\n    """全局问候"""\n    print("Hello World!")'''),
-    (8, 10, '''def greet_user(name):\n    """个性化问候"""\n    print(f"Hi, {name}!")''')
-)
-
-# 如果改错了，可以撤销
-file_ops.undo_file("demo.py")
-
-# 查看最终修改结果
-ok, content = file_ops.read_file("demo.py")
-print(content)
-```
-
-## CLI 使用示例
-
-```bash
-# 读取文件的前 20 行
-python cli.py read_lines test.py 1 20
-
-# 在第 5 行前插入代码
-python cli.py insert_line test.py 5 "    x = x + 1"
-
-# 删除最后一行
-python cli.py delete_line test.py -1
-
-# 替换所有 print 为 log
-python cli.py search_replace test.py "print" "log"
-
-# 正则替换函数名前缀
-python cli.py search_replace test.py "def old_" "def new_" --regex
-```
