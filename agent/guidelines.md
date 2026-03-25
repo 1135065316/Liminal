@@ -128,21 +128,25 @@ API_KEY = "sk-abc123..."
 ## 模块间依赖规则
 
 ```
-agent.py
-  ├── base_ops.py (OK)
-  ├── deepseek.py (OK)
-  └── skills/file_ops (OK)
+backend/core/
+├── agent.py
+│   ├── base_ops.py (OK)
+│   ├── deepseek.py (OK)
+│   ├── context_manager.py (OK)
+│   ├── conversation_logger.py (OK)
+│   └── skill_dispatcher.py (OK)
+├── base_ops.py
+│   └── skill_dispatcher.py (延迟导入，避免循环依赖)
+├── skill_dispatcher.py
+│   └── backend/skills/* (动态扫描)
+└── deepseek.py
+    └── (自包含，不依赖其他业务模块)
 
-base_ops.py
-  └── (无依赖，最底层)
-
-deepseek.py
-  └── (自包含，不依赖其他业务模块)
-
-skills/*
-  ├── base_ops.py (OK)
-  └── deepseek.py (避免，技能应保持独立)
+backend/skills/*
+  └── (自包含，通过 sys.path 导入 base_ops.WORK_DIR)
 ```
+
+**注意**：skill_dispatcher 从 `backend/core/` 扫描 `backend/skills/`，路径为 `parent.parent / "skills"`
 
 **原则**：
 - 上层可以依赖下层
@@ -163,4 +167,4 @@ skills/*
 ---
 
 **维护者**：Kimi Code CLI  
-**最后更新**：2026-03-22
+**最后更新**：2026-03-25（更新模块依赖规则，反映 core 目录结构）

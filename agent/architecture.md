@@ -32,19 +32,39 @@
               └──────────────────────────┘
 ```
 
+## 目录结构
+
+```
+backend/
+├── core/                          # Agent 核心代码
+│   ├── agent.py                   # 主入口，事件循环
+│   ├── base_ops.py                # 基础操作（bash、skill路由、JSON解析）
+│   ├── skill_dispatcher.py        # Skill 命令解析与调度
+│   ├── deepseek.py                # DeepSeek API 适配
+│   ├── context_manager.py         # Token 计数、上下文限制、中断处理
+│   └── conversation_logger.py     # 对话记录保存
+├── skills/                        # 技能系统
+│   └── file_ops/                  # 文件操作技能
+│       ├── skill.md               # 技能文档
+│       └── scripts/
+│           ├── __init__.py
+│           └── file_ops.py        # 实现代码
+└── conversations/                 # 对话记录
+```
+
 ## 当前实现状态
 
 ### 已完成的模块
 
 | 模块 | 文件 | 职责 | 状态 |
 |------|------|------|------|
-| Shell Agent | `backend/agent.py` | 通过 bash/skill 自动化执行任务 | ✅ 可用 |
-| 基础操作 | `backend/base_ops.py` | bash/skill 执行、工作目录管理 | ✅ 可用 |
-| Skill 调度器 | `backend/skill_dispatcher.py` | 解析并路由 skill 命令 | ✅ 可用 |
-| DeepSeek 适配 | `backend/deepseek.py` | DeepSeek API 封装 | ✅ 可用 |
-| 对话记录 | `backend/conversation_logger.py` | 保存对话历史 | ✅ 可用 |
+| Shell Agent | `backend/core/agent.py` | 通过 bash/skill 自动化执行任务 | ✅ 可用 |
+| 基础操作 | `backend/core/base_ops.py` | bash/skill 执行、工作目录管理、JSON解析 | ✅ 可用 |
+| Skill 调度器 | `backend/core/skill_dispatcher.py` | 解析并路由 skill 命令 | ✅ 可用 |
+| DeepSeek 适配 | `backend/core/deepseek.py` | DeepSeek API 封装 | ✅ 可用 |
+| 对话记录 | `backend/core/conversation_logger.py` | 保存对话历史 | ✅ 可用 |
+| 上下文管理 | `backend/core/context_manager.py` | Token 计数、上下文限制、中断处理 | ✅ 可用 |
 | 文件技能 | `backend/skills/file_ops/` | 文件操作技能（精细行级） | ✅ 可用 |
-| 上下文管理 | `backend/context_manager.py` | Token 计数、上下文限制、中断处理 | ✅ 可用 |
 
 ### 待实现的核心模块
 
@@ -58,18 +78,34 @@
 
 ## 关键设计决策
 
-### 决策 0：上下文管理独立模块
+### 决策 0：代码迁移到 core 目录
 
-**背景**：Token 计数、上下文限制检查、Ctrl+C 中断处理最初散落在 agent.py
+**背景**：backend 根目录文件增多，需要更好的组织结构
 
-**决策**：抽取 `context_manager.py` 统一处理
-- `count_tokens()` / `count_messages()`：tiktoken 精确计数（cl100k_base）
-- `check_context_limit()`：128K × 80% 阈值检查
-- `Interruptible`：上下文管理器包装可中断操作
+**决策**：创建 `backend/core/` 目录，将 Agent 相关代码移入
+- `agent.py`, `base_ops.py`, `deepseek.py`
+- `context_manager.py`, `conversation_logger.py`
+- `skill_dispatcher.py`
 
-**效果**：agent.py 精简 30+ 行，主逻辑更清晰
+**影响**：
+- skill_dispatcher.py 中 `SKILLS_DIR` 路径需调整：`parent / "skills"` → `parent.parent / "skills"`
+- 模块间导入保持相对导入，无需修改
 
-### 决策 1：为什么从 bash 开始？
+### 决策 1：JSON 响应格式
+
+**背景**：原有格式 `DONE:/FAIL:` 不够灵活，无法表达 AI 的中间思考
+
+**决策**：强制使用 JSON 格式响应
+```json
+{"command": "要执行的命令", "thought": "你的想法"}
+```
+
+**效果**：
+- AI 可以在 `thought` 字段展示思考过程
+- `base_ops.parse_ai_response()` 统一解析
+- 向后兼容：仍支持 `DONE:/FAIL:` 格式
+
+### 决策 2：为什么从 bash 开始？
 
 **背景**：考虑过封装高级 API（文件操作、代码编辑等）
 
@@ -80,7 +116,7 @@
 2. 透明性：每个操作都可观测、可回放
 3. 涌现性：限制越多，涌现越难；bash 是最低限制接口
 
-### 决策 2：模型适配层独立
+### 决策 3：模型适配层独立
 
 **背景**：是否把 API 调用直接写在 agent.py 里？
 
@@ -90,9 +126,10 @@
 ```python
 # 所有模型适配器遵循相同接口
 def chat(messages) -> str
+def check_api_key() -> bool
 ```
 
-### 决策 3：Skill 命令自动路由
+### 决策 4：Skill 命令自动路由
 
 **背景**：Agent 需要既能执行 bash 又能使用 skill
 
@@ -114,7 +151,7 @@ Agent 输出 -> run_command()
 - 收集各模块 `COMMANDS` 字典中的命令
 - 运行时动态构建命令路由表
 
-### 决策 3：技能系统分层
+### 决策 5：技能系统分层
 
 **背景**：file_ops 已经很强大，Agent 是否直接调用？
 
@@ -126,7 +163,7 @@ Agent 输出 -> run_command()
 
 ### 添加新 Agent 类型
 
-1. 创建 `backend/<agent_name>.py`
+1. 创建 `backend/core/<agent_name>.py`
 2. 导入所需模块（base_ops、deepseek 等）
 3. 实现 `main()` 入口
 4. 在本文档更新状态
@@ -140,7 +177,7 @@ Agent 输出 -> run_command()
 
 ### 添加新模型
 
-1. 创建 `backend/<model_name>.py`
+1. 创建 `backend/core/<model_name>.py`
 2. 实现 `chat(messages) -> str` 接口
 3. 实现 `check_api_key() -> bool` 接口
 4. 添加环境变量配置说明
@@ -162,4 +199,4 @@ Agent 输出 -> run_command()
 ---
 
 **维护者**：Kimi Code CLI  
-**最后更新**：2026-03-22（新增 context_manager 模块）
+**最后更新**：2026-03-25（新增 core 目录结构和 JSON 响应格式决策）

@@ -13,15 +13,18 @@
 ```
 涌现式AI集群/
 ├── backend/              # 后端核心
-│   ├── agent.py          # Agent 主程序（bash 自动化执行）
-│   ├── base_ops.py       # 基础操作（bash 执行、环境配置）
-│   ├── deepseek.py       # DeepSeek API 封装
-│   ├── conversation_logger.py  # 对话记录模块
-│   ├── context_manager.py # 上下文管理（Token计数、中断处理）
-│   └── skills/           # 技能系统
-│       └── file_ops/     # 文件操作技能
+│   ├── core/             # Agent 核心代码
+│   │   ├── agent.py      # Agent 主程序（bash 自动化执行）
+│   │   ├── base_ops.py   # 基础操作（bash 执行、AI响应解析）
+│   │   ├── deepseek.py   # DeepSeek API 封装
+│   │   ├── conversation_logger.py  # 对话记录模块
+│   │   ├── context_manager.py      # 上下文管理（Token计数、中断处理）
+│   │   └── skill_dispatcher.py     # Skill 命令调度器
+│   ├── skills/           # 技能系统
+│   │   └── file_ops/     # 文件操作技能（精细行级编辑）
+│   └── conversations/    # 对话记录存储
 ├── frontend/             # Vue3 + Vite 前端（端口 14514）
-├── conversations/        # 对话记录（.gitignore 忽略）
+├── conversations/        # 项目级对话记录（.gitignore 忽略）
 ├── agent/                # 本项目知识库（你在的位置）
 └── start.vbs             # Windows 一键启动脚本
 ```
@@ -33,12 +36,23 @@
 - 不封装过度抽象的 API，保持与环境的最直接交互
 - 每个 Agent 都是"能思考的程序"，而非"被调用的接口"
 
-### 2. 模块化与正交性
+### 2. JSON 响应格式
+Agent 必须输出严格的 JSON 格式：
+```json
+{"command": "要执行的命令", "thought": "你的想法说明"}
+```
+- `command`: bash 命令或 skill 命令（如 `create_file("test.txt", "hello")`）
+- `thought`: 可选，用于向用户展示 AI 的思考过程
+- 任务完成时: `command` 填 `"DONE:结果描述"`
+- 无法完成时: `command` 填 `"FAIL:原因"`
+
+### 3. 模块化与正交性
 - `base_ops`：纯基础操作，与 LLM 无关
 - `deepseek.py`：纯模型适配，可替换为 Claude/GPT/本地模型
 - `agent.py`：纯业务逻辑，协调调用
+- `skill_dispatcher.py`：自动路由 bash/skill 命令
 
-### 3. 涌现式设计
+### 4. 涌现式设计
 - 单个 Agent 能力有限
 - 多个专精 Agent 通过**消息传递**和**共享状态**协作
 - 复杂任务分解为子任务，分配给不同 Agent
@@ -50,16 +64,11 @@
 - 函数返回格式：`(success: bool, result: str)`
 - 错误处理：返回元组而非抛出异常（便于 Agent 理解）
 
-### 新增模块原则
-1. **单一职责**：一个模块只做一类事
-2. **自包含**：依赖明确，不隐式依赖全局状态
-3. **可观测**：重要操作要有日志/记录
-
 ### 文件组织
 ```
 backend/
-├── <name>.py              # 核心模块
-├── <name>_test.py         # 测试（可选）
+├── core/
+│   └── <name>.py          # 核心模块
 └── skills/
     └── <skill_name>/
         ├── skill.md       # 技能文档（必须）
@@ -75,7 +84,7 @@ backend/
 ### 接手项目时
 1. 先阅读本文件和 [architecture.md](./architecture.md)
 2. 检查 `git status` 了解当前改动状态
-3. 查看 `backend/agent.py` 了解当前 Agent 能力
+3. 查看 `backend/core/agent.py` 了解当前 Agent 能力
 4. 阅读最近的 `conversations/*.md` 了解近期对话上下文
 
 ### 修改代码时
@@ -90,4 +99,4 @@ backend/
 ---
 
 **维护者**：Kimi Code CLI  
-**最后更新**：2026-03-22（添加 context_manager 模块说明）
+**最后更新**：2026-03-25（更新 core 目录结构和 JSON 响应格式）

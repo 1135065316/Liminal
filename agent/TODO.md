@@ -62,6 +62,20 @@
   - [x] tiktoken 精确 Token 计数（cl100k_base）
   - [x] 128K 上下文长度限制（80% 阈值）
   - [x] Ctrl+C 中断处理（Interruptible 包装器）
+- [x] **代码结构重构**（2026-03-25）
+  - [x] 创建 backend/core/ 目录
+  - [x] 迁移 agent 相关代码到 core/
+  - [x] 更新 skill_dispatcher 路径
+- [x] **JSON 响应格式**（2026-03-25）
+  - [x] 强制 JSON 格式：`{"command": "...", "thought": "..."}`
+  - [x] base_ops.parse_ai_response() 统一解析
+  - [x] 向后兼容 DONE:/FAIL: 格式
+- [x] **文件操作增强**（2026-03-25）
+  - [x] delete_files(*paths)：批量删除文件
+  - [x] delete_files_by_pattern(pattern, path)：按通配符删除
+  - [x] replace_batch 支持元组和平铺两种格式
+  - [x] delete_line 支持批量删除
+  - [x] undo_file：撤销最后一次修改
 
 ## 想法池（待讨论）
 
@@ -73,4 +87,4 @@
 ---
 
 **维护者**：Kimi Code CLI  
-**最后更新**：2026-03-22（更新已完成任务）
+**最后更新**：2026-03-25（更新已完成任务）
